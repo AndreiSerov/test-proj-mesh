@@ -15,7 +15,7 @@ Layers: `api` (controllers, error mapping) -> `service` (rules, transactions) ->
 ### Local development
 
 ```bash
-docker compose up -d                                  # PostgreSQL on :5432 (db/user/password: bank)
+docker compose up -d                                  # PostgreSQL on :5432 (db/user/password: bank), Redis on :6379
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
@@ -36,6 +36,7 @@ JWT_SECRET='change-me-to-at-least-32-random-bytes!!' ./mvnw spring-boot:run
 | `JWT_SECRET` | none, required (>= 32 bytes) | HS256 signing key |
 | `DB_URL` | `jdbc:postgresql://localhost:5432/bank` | JDBC URL |
 | `DB_USER` / `DB_PASSWORD` | `bank` / `bank` | database credentials |
+| `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | cache; the API keeps working (uncached) if Redis is down |
 
 Swagger UI: <http://localhost:8080/swagger-ui.html> (use *Authorize* with the token from login).
 
@@ -70,7 +71,7 @@ validation failures list each field under `errors`.
 - **Interest:** every 30 seconds each balance grows by 10%, capped at 207% of the initial deposit (half-even rounding to 2 decimals). A balance above the cap is left alone; one below it resumes earning. Runs on a single instance, no distributed lock.
 - **Transfers** lock both accounts in ascending id order in one transaction ([ADR 0002](docs/adr/0002-pessimistic-ordered-locks-for-transfers.md)), so balances never go negative and money is conserved under concurrency. Each transfer is stored.
 - **Login** has no throttling or lockout (out of scope for the task). Failed logins cost the same BCrypt work whether or not the identifier exists.
-- No caching: stale reads on money cost more than they save.
+- **Caching** ([ADR 0004](docs/adr/0004-redis-cache-for-read-mostly-user-data.md)): Redis caches other users' profiles (10 min) and search pages (1 min); any contact change evicts them. Balances, accounts and transfers are never cached: stale reads on money cost more than they save.
 
 ## Test
 

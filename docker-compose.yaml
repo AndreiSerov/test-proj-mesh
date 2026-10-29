@@ -1,4 +1,4 @@
-# Local development database. The app itself runs from the IDE or `./mvnw spring-boot:run`
+# Local development database and cache. The app itself runs from the IDE or `./mvnw spring-boot:run`
 # with the `local` profile, see application-local.yml.
 services:
   postgres:
@@ -14,6 +14,19 @@ services:
       - bank-db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U bank -d bank"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8.10.2-alpine
+    container_name: bank-redis
+    ports:
+      - "6379:6379"
+    # a pure cache: evict cold keys under memory pressure instead of refusing writes
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10

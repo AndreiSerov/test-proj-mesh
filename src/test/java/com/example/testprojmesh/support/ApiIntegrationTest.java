@@ -2,7 +2,9 @@ package com.example.testprojmesh.support;
 
 import com.example.testprojmesh.dao.entity.UserEntity;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
@@ -14,6 +16,15 @@ public abstract class ApiIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     protected TestUsers testUsers;
+
+    @Autowired
+    CacheManager cacheManager;
+
+    /** Cached entries from one test must never answer another test's request. */
+    @BeforeEach
+    void clearCaches() {
+        cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
+    }
 
     protected String loginAs(UserEntity user) {
         String email = user.getEmails().get(0).getValue();

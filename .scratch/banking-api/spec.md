@@ -114,7 +114,7 @@ A REST API (Spring Boot, PostgreSQL, Maven) with three layers: API, service, and
 - **Transfer algorithm:** within a single transaction, lock both Accounts with pessimistic row locks acquired in ascending account id order, re-check the Balance after locking, debit and credit, and persist the Transfer record. Rejections: non-positive or over-precise amount (400), self-Transfer (422), unknown recipient (404), insufficient Balance (422). Rationale is in ADR 0002.
 - **Interest accrual:** a scheduled job every 30 seconds on a single application instance (no distributed lock). It runs one atomic update: the new Balance is the lesser of the current Balance times 1.10 and the Interest cap, but never below the current Balance, so Balances above the cap are untouched. The accrual itself lives in a service method that tests can call directly.
 - **Errors:** RFC 9457 `ProblemDetail` for every error, with a stable `type` and a per-field list on validation failures. A write under another User's id is a 403 (`urn:problem:forbidden`).
-- **Optional extras included:** minimal springdoc Swagger configuration and meaningful SLF4J logging (no tokens, passwords or secrets in logs). Caching is deliberately excluded; Redis and Elasticsearch are not used.
+- **Optional extras included:** minimal springdoc Swagger configuration and meaningful SLF4J logging (no tokens, passwords or secrets in logs). Redis caching of other Users' profiles and search pages, never of Balances (`.scratch/redis-caching/spec.md`, ADR 0004); Elasticsearch is not used.
 - **Vocabulary:** terms follow `GLOSSARY.md` (User, Account, Balance, Initial deposit, Interest accrual, Interest cap, Transfer, Contact).
 
 ## Testing Decisions
@@ -135,7 +135,7 @@ A REST API (Spring Boot, PostgreSQL, Maven) with three layers: API, service, and
 - Idempotency keys for Transfers, Transfer history or listing endpoints, reversals, fees, currencies.
 - Refresh tokens, token revocation, rate limiting.
 - Multi-instance deployment and distributed job locking.
-- Caching, Redis, Elasticsearch, any frontend.
+- Caching of Balances, Accounts or Transfers; Elasticsearch; any frontend.
 - Gradle, Docker packaging and CI setup (can be added later with the devops skills).
 
 ## Further Notes

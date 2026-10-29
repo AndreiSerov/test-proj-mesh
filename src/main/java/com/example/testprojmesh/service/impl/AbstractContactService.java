@@ -1,6 +1,7 @@
 package com.example.testprojmesh.service.impl;
 
 import com.example.testprojmesh.api.error.ApiException;
+import com.example.testprojmesh.config.CacheConfig;
 import com.example.testprojmesh.dao.entity.ContactEntity;
 import com.example.testprojmesh.dao.entity.UserEntity;
 import com.example.testprojmesh.dao.repository.ContactRepository;
@@ -11,6 +12,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +39,9 @@ public abstract class AbstractContactService<E extends ContactEntity> implements
 
     @Override
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(cacheNames = CacheConfig.USER_PROFILES, key = "#userId"),
+        @CacheEvict(cacheNames = CacheConfig.USER_SEARCH, allEntries = true)})
     public ContactView add(long userId, String raw) {
         String value = normalizer.apply(raw);
         UserEntity user = lockUser(userId);
@@ -55,6 +61,9 @@ public abstract class AbstractContactService<E extends ContactEntity> implements
 
     @Override
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(cacheNames = CacheConfig.USER_PROFILES, key = "#userId"),
+        @CacheEvict(cacheNames = CacheConfig.USER_SEARCH, allEntries = true)})
     public ContactView change(long userId, long contactId, String raw) {
         String value = normalizer.apply(raw);
         lockUser(userId);
@@ -70,6 +79,9 @@ public abstract class AbstractContactService<E extends ContactEntity> implements
 
     @Override
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(cacheNames = CacheConfig.USER_PROFILES, key = "#userId"),
+        @CacheEvict(cacheNames = CacheConfig.USER_SEARCH, allEntries = true)})
     public void delete(long userId, long contactId) {
         lockUser(userId);
         E contact = owned(userId, contactId);

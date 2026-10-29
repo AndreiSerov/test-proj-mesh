@@ -1,0 +1,5 @@
+# Redis cache for read-mostly User data, never for money
+
+Two reads are cached in Redis through Spring Cache: another User's public profile (`userProfiles`, by user id, 10 minutes) and search result pages (`userSearch`, by every criterion plus page and size, 1 minute). They return only name, date of birth, emails and phones, which change rarely and only through the Contact endpoints; every Contact add, change or delete evicts the owner's profile and empties the search cache. The cache manager is transaction-aware, so evictions run after the commit. Values are JSON with one known type per cache, every entry has a TTL, and a cache error is logged and treated as a miss.
+
+Balances, Accounts, Transfers, the owner's own profile and login lookups are never cached: Balances change on every Transfer and every 30-second Interest accrual, Transfers must read them under row locks (ADR 0002), and a stale Balance costs more than a database read saves. Redis was chosen over an in-process Caffeine cache at the user's request; it also keeps eviction correct if the app ever runs on more than one instance, although the Interest job still assumes one.

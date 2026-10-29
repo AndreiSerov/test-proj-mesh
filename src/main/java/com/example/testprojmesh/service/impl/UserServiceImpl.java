@@ -1,6 +1,7 @@
 package com.example.testprojmesh.service.impl;
 
 import com.example.testprojmesh.api.error.ApiException;
+import com.example.testprojmesh.config.CacheConfig;
 import com.example.testprojmesh.dao.entity.ContactEntity;
 import com.example.testprojmesh.dao.entity.UserEntity;
 import com.example.testprojmesh.dao.repository.UserRepository;
@@ -12,8 +13,10 @@ import com.example.testprojmesh.service.model.ProfileView;
 import com.example.testprojmesh.service.model.UserSearchCriteria;
 import com.example.testprojmesh.service.model.UserSummary;
 import com.example.testprojmesh.util.ContactNormalizer;
+import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -25,22 +28,36 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository users;
+    private final PublicProfileReader publicProfiles;
 
+    /** The owner's view carries the Balance and is always read fresh; anyone else's comes from the cache. */
     @Override
     @Transactional(readOnly = true)
     public ProfileView profile(long viewerId, long userId) {
-        UserEntity user = users.findById(userId)
-            .orElseThrow(() -> ApiException.notFound("User not found: " + userId));
+        if (viewerId != userId) {
+            return publicProfiles.publicProfile(userId);
+        }
+        UserEntity user = find(users, userId);
+        return profileOf(user, user.getAccount().getBalance());
+    }
+
+    static UserEntity find(UserRepository users, long userId) {
+        return users.findById(userId).orElseThrow(() -> ApiException.notFound("User not found: " + userId));
+    }
+
+    static ProfileView profileOf(UserEntity user, BigDecimal balance) {
         return new ProfileView(
             user.getId(),
             user.getName(),
             user.getDateOfBirth(),
             contactViews(user.getEmails()),
             contactViews(user.getPhones()),
-            viewerId == userId ? user.getAccount().getBalance() : null);
+            balance);
     }
 
+    /** Keyed by every criterion plus page and size; emptied by any Contact write. */
     @Override
+    @Cacheable(cacheNames = CacheConfig.USER_SEARCH, key = "#criteria.toString() + ':' + #page + ':' + #size")
     @Transactional(readOnly = true)
     public PageView<UserSummary> search(UserSearchCriteria criteria, int page, int size) {
         Specification<UserEntity> spec = Specification.unrestricted();

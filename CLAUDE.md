@@ -9,7 +9,7 @@ Domain vocabulary: `GLOSSARY.md` (User, Account, Balance, Initial deposit, Inter
 ## Commands
 
 ```bash
-docker compose up -d                                        # local PostgreSQL (db/user/password: bank)
+docker compose up -d                                        # local PostgreSQL (db/user/password: bank) and Redis
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local     # run the app (profile: application-local.yml)
 ./mvnw verify                                               # all tests; needs Docker or Podman for Testcontainers
 ./mvnw test -Dtest=TransferServiceTest                      # one test class
@@ -19,7 +19,7 @@ docker compose up -d                                        # local PostgreSQL (
 `verify` writes the JaCoCo coverage report to `target/site/jacoco/index.html`.
 Checkstyle rules live in `config/checkstyle/checkstyle.xml` (4-space indent, 120 columns, no unused imports); fix the code, don't loosen the rules.
 
-Outside the `local` profile the app needs `JWT_SECRET` (>= 32 bytes); `DB_URL`, `DB_USER`, `DB_PASSWORD` are optional.
+Outside the `local` profile the app needs `JWT_SECRET` (>= 32 bytes); `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT` are optional.
 Swagger UI: `/swagger-ui.html`. Seed users (password `password123`): alice@example.com, bob@example.com, alina@example.com.
 
 On this machine Docker runs through Podman: if `docker ps` cannot connect, run `podman machine start`.
@@ -44,14 +44,15 @@ The schema is owned by Flyway migrations in `src/main/resources/db/migration` (n
 - The sender of a Transfer, and the owner passed to any Contact service, still comes only from the JWT (`TokenService.userId`), never from the path or a request body. The Balance is returned only on the caller's own profile.
 - Emails are stored lowercased, phones as digits only (10 to 15); both are unique across all Users and each User keeps at least one of each.
 - Errors go through `ApiException` (400 invalid, 401, 403 not the owner, 404, 409 conflict, 422 unprocessable); security filters write theirs with `ProblemResponses.write` from an `HttpStatus`. The problem `type` is derived from the status (`urn:problem:not-found`, `bad-request`, `unprocessable-content`, ...), never hand-written. Do not log tokens, passwords or Balances.
-- No caching on purpose. Interest runs on a single instance, no distributed lock.
+- Caching (ADR 0004, `config/CacheConfig`): Redis caches only `userProfiles` (another User's profile, no Balance, via `PublicProfileReader`) and `userSearch`. Every Contact write must evict both (`AbstractContactService`). Never cache Balances, Accounts, Transfers or the owner's own profile; every cache needs a TTL. Interest runs on a single instance, no distributed lock.
 
 ## Testing
 
-- API tests extend `ApiIntegrationTest` (MockMvc + Testcontainers Postgres); create users with `TestUsers`, one fresh user per test, never rely on seed balances beyond `LoginAndProfileTest`/`SeedDataTest`.
+- API tests extend `ApiIntegrationTest` (MockMvc + Testcontainers Postgres and Redis; every cache is cleared before each test); create users with `TestUsers`, one fresh user per test, never rely on seed balances beyond `LoginAndProfileTest`/`SeedDataTest`.
 - Tests that call interest accrual use their own context (`@TestPropertySource(properties = "test.context=...")`) because accrual touches every account.
 - The scheduler is off in tests (`app.interest.enabled=false`); call `InterestService.accrue()` directly instead of waiting 30 seconds.
 - Use the `tdd` skill, test only at the agreed seams: API (MockMvc), transfer service unit tests, concurrency test, accrual service.
+- Caching is tested from outside in `CachingTest`: a change written with `JdbcTemplate` stays invisible while cached, and a Contact write through the API makes it visible.
 
 ## Agent skills
 
