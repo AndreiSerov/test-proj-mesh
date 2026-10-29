@@ -1,0 +1,5 @@
+# Owner id in the path, checked against the token
+
+User-owned resources are addressed as `/api/users/{userId}` and `/api/users/{userId}/emails|phones`; the `/api/users/me` alias is gone. This replaces the earlier rule that the owner never appears in the request: the owner may now appear in the path, but a Contact write is allowed only when `{userId}` equals the token's `USER_ID`. One `AuthorizationManager` in `SecurityConfig` enforces that for every Contact path and answers 403 before body validation or any service code runs. Controllers still pass the token's id to the services, so the path only addresses the resource; dropping the guard by mistake cannot let one User write another's Contacts. Any User may read any profile, but the Balance is included only for the owner.
+
+We chose this over keeping `/me` because every User gets one canonical URL and other profiles become readable without search. The cost is an ownership check that `/me` never needed; it lives in one place and is covered by 403 tests for every write. The Transfer sender still comes only from the token (`POST /api/transfers` unchanged).

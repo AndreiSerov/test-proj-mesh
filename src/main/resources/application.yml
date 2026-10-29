@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: test-proj-mesh
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate.default_batch_fetch_size: 50
+    hibernate:
+      ddl-auto: validate
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/bank}
+    username: ${DB_USER:bank}
+    password: ${DB_PASSWORD:bank}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:}
+    ttl: 1h

@@ -1,0 +1,17 @@
+# Local development profile: connects to the database from docker-compose.yaml.
+# Activate with SPRING_PROFILES_ACTIVE=local (IDE run configuration) or
+# ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bank
+    username: bank
+    password: bank
+
+app:
+  jwt:
+    # Development-only key; real environments must supply JWT_SECRET.
+    secret: local-development-secret-do-not-use-in-production
+
+logging:
+  level:
+    com.example.testprojmesh: DEBUG
